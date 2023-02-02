@@ -98,8 +98,10 @@ void loop() {
         break;
 
       // Toggle cases
-      case 'M': // Toggle Mirror
+      case 'M': // Toggle Mirror and vflip
         s->set_hmirror(s, !s->status.hmirror);
+        if (s->status.hmirror)
+          s->set_vflip(s, !s->status.vflip);
         break;
       case '>':
         disable_dithering = !disable_dithering;
