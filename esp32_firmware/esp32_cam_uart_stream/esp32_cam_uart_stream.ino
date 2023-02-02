@@ -156,14 +156,8 @@ void loop() {
   delay(50);
 }
 
-bool IsDarkBit(uint8_t bit){
-  bool result = bit < 128;
-
-  if (invert){
-    result = !result;
-  }
-
-  return result;
+inline bool IsDarkBit(const uint8_t bit) {
+  return (invert ^ (bit < 128));
 }
 
 void DitherImage(camera_fb_t* fb) {
