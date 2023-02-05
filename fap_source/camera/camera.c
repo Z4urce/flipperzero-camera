@@ -1,6 +1,5 @@
 #include "camera.h"
 
-
 static void camera_view_draw_callback(Canvas* canvas, void* _model) {
     UartDumpModel* model = _model;
 
@@ -10,8 +9,22 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
     canvas_draw_frame(canvas, 0, 0, FRAME_WIDTH, FRAME_HEIGTH);
 
     for(size_t p = 0; p < FRAME_BUFFER_LENGTH; ++p) {
-        uint8_t x = p % ROW_BUFFER_LENGTH; // 0 .. 15
-        uint8_t y = p / ROW_BUFFER_LENGTH; // 0 .. 63
+        //uint8_t x = p % ROW_BUFFER_LENGTH; // 0 .. 15
+        //uint8_t y = p / ROW_BUFFER_LENGTH; // 0 .. 63
+        
+        uint8_t x = row_lookup[p];
+        uint8_t y = col_lookup[p];
+        uint8_t fb_value = model->fb[p];
+
+        for (uint8_t i = 0; i < 4; ++i) {
+            uint8_t color = colors_lookup[fb_value][i];
+            
+            if (color == 0 ||
+                ((color == 170) && (model->frame_count % 3 != 0)) ||
+                ((color == 85) && ((model->frame_count*10) % 15 == 0))) {
+                canvas_draw_dot(canvas, (x * 4) + i, y);
+            }
+        }
 
         // 1 bit
         // for(uint8_t i = 0; i < 8; ++i) {
@@ -21,17 +34,17 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         // }
 
         // 2 bit
-        for (uint8_t i = 0; i < 4; ++i){ // 4 grayscale pixel in 1 fb element
-            // 0,1,2,3 ; 0,1 2,3 4,5 6,7
-            bool first_bit = model->fb[p] & (1 << (7 - (i*2)));
-            bool second_bit = model->fb[p] & (1 << (7 - ((i*2)+1)));
+        // for (uint8_t i = 0; i < 4; ++i){ // 4 grayscale pixel in 1 fb element
+        //     // 0,1,2,3 ; 0,1 2,3 4,5 6,7
+        //     bool first_bit = model->fb[p] & (1 << (7 - (i*2)));
+        //     bool second_bit = model->fb[p] & (1 << (7 - ((i*2)+1)));
 
-            if((!second_bit && !first_bit) || // 00
-            ((second_bit && !first_bit) && (model->frame_count % 3 != 0))|| //10 - 170
-            ((!second_bit && first_bit) && ((model->frame_count*10) % 15 == 0))) {  //01 - 85
-                canvas_draw_dot(canvas, (x * 4) + i, y);
-            }
-        }
+        //     if((!second_bit && !first_bit) || // 00
+        //     ((second_bit && !first_bit) && (model->frame_count % 3 != 0))|| //10 - 170
+        //     ((!second_bit && first_bit) && ((model->frame_count*10) % 15 == 0))) {  //01 - 85
+        //         canvas_draw_dot(canvas, (x * 4) + i, y);
+        //     }
+        // }
     }
 
     if (!model->initialized){
@@ -227,6 +240,37 @@ static int32_t camera_worker(void* context) {
     return 0;
 }
 
+static void precompute_lookup_tables() {
+    for(size_t i = 0; i < FRAME_BUFFER_LENGTH; i++) {
+        row_lookup[i] = i % ROW_BUFFER_LENGTH; // 0 .. 15
+        col_lookup[i] = i / ROW_BUFFER_LENGTH; // 0 .. 63
+    }
+
+    for (uint8_t byte = 0; ; ++byte){
+        for (uint8_t i = 0; i < 4; ++i){ // 4 grayscale pixel in 1 fb element
+            bool first_bit = byte & (1 << (7 - (i*2)));
+            bool second_bit = byte & (1 << (7 - ((i*2)+1)));
+            // 0 = 00, 85 = 01, 170 = 10, 255 = 11
+            if(!second_bit && !first_bit){  // 00
+                colors_lookup[byte][i] = 0;
+            }
+            else if ((!second_bit && first_bit)){   // 01
+                colors_lookup[byte][i] = 85;
+            }
+            else if ((second_bit && !first_bit)) {  // 10
+                colors_lookup[byte][i] = 170;
+            }
+            else {  // 11
+                colors_lookup[byte][i] = 255;
+            }
+        }
+
+        if (byte == UINT8_MAX){
+            break;
+        }
+    }
+}
+
 static CameraApp* camera_app_alloc() {
     CameraApp* app = malloc(sizeof(CameraApp));
 
@@ -274,6 +318,8 @@ static CameraApp* camera_app_alloc() {
     uart_send('2');
 
     notification_message_block(app->notification, &sequence_display_backlight_enforce_on);
+
+    precompute_lookup_tables();
 
     return app;
 }

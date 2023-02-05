@@ -73,3 +73,7 @@ typedef enum {
 } WorkerEventFlags;
 
 #define WORKER_EVENTS_MASK (WorkerEventStop | WorkerEventRx)
+
+uint8_t row_lookup[FRAME_BUFFER_LENGTH]; // precomputed x values
+uint8_t col_lookup[FRAME_BUFFER_LENGTH]; // precomputed y values
+uint8_t colors_lookup[256][4];
