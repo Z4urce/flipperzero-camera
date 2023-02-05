@@ -55,7 +55,6 @@ typedef struct {
     View* view;
     FuriThread* worker_thread;
     FuriStreamBuffer* rx_stream;
-    size_t delay;
 } CameraApp;
 
 struct UartDumpModel {
@@ -65,7 +64,6 @@ struct UartDumpModel {
 
     uint8_t row_ringbuffer[RING_BUFFER_LENGTH];
     uint8_t ringbuffer_index;
-    size_t delay_display;
 };
 
 typedef enum {
@@ -75,9 +73,3 @@ typedef enum {
 } WorkerEventFlags;
 
 #define WORKER_EVENTS_MASK (WorkerEventStop | WorkerEventRx)
-
-const NotificationSequence sequence_notification = {
-    &message_display_backlight_on,
-    &message_delay_10,
-    NULL,
-};

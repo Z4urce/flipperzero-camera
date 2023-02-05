@@ -1,0 +1,29 @@
+### Shades:
+
+// 0 (0)
+canvas_reset(instance->canvas);
+
+// 01 (85)        
+canvas_draw_box(instance->canvas, 0, 32, 32, 32);
+if (frame_count % 3 != 0){
+        canvas_draw_box(instance->canvas, 32, 32, 32, 32);
+}
+
+// 10 (170)
+if ((frame_count*10) % 15 == 0){
+        canvas_draw_box(instance->canvas, 64, 32, 32, 32);
+}
+
+// 11 (255)
+(nothing as it is pure white)
+
+
+### Waiting for refresh:
+
+size_t prev_delay = 0;
+...
+size_t delay_ticks = furi_hal_cortex_instructions_per_microsecond() * app->delay;
+if ((DWT->CYCCNT - prev_delay) >= delay_ticks) {
+    with_view_model(app->view, UartDumpModel * model, { model->delay_display = app->delay; }, true);
+    prev_delay = DWT->CYCCNT;
+}

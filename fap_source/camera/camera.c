@@ -13,22 +13,18 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         uint8_t x = p % ROW_BUFFER_LENGTH; // 0 .. 15
         uint8_t y = p / ROW_BUFFER_LENGTH; // 0 .. 63
 
+        // 1 bit
         // for(uint8_t i = 0; i < 8; ++i) {
         //     if((model->fb[p] & (1 << (7 - i))) != 0) {
         //         canvas_draw_dot(canvas, (x * 8) + i, y);
         //     }
         // }
+
+        // 2 bit
         for (uint8_t i = 0; i < 4; ++i){ // 4 grayscale pixel in 1 fb element
             // 0,1,2,3 ; 0,1 2,3 4,5 6,7
             bool first_bit = model->fb[p] & (1 << (7 - (i*2)));
             bool second_bit = model->fb[p] & (1 << (7 - ((i*2)+1)));
-            // 0 = 00, 85 = 01, 170 = 10, 255 = 11
-            // if ((!second_bit && first_bit) && ((model->frame_count*10) % 15 == 0)){
-            //     canvas_draw_dot(canvas, (x * 4) + i, y);
-            // }
-            // if ((second_bit && !first_bit) && (model->frame_count % 3 != 0)){
-            //    canvas_draw_dot(canvas, (x * 4) + i, y);
-            // }
 
             if((!second_bit && !first_bit) || // 00
             ((second_bit && !first_bit) && (model->frame_count % 3 != 0))|| //10 - 170
@@ -47,10 +43,6 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         canvas_draw_str(canvas, 20, 44, "U0R - TX");
         canvas_draw_str(canvas, 20, 54, "U0T - RX");
     }
-
-    char buffer[32] = {0};
-    snprintf(buffer, 32, "Delay: %u", model->delay_display);
-    canvas_draw_str(canvas, 20, 64, buffer);
 
     ++model->frame_count;
 }
@@ -124,52 +116,28 @@ static void uart_send(char c){
 }
 
 static bool camera_view_input_callback(InputEvent* event, void* context) {
-    furi_assert(context);
-    CameraApp* app = context;
+    //furi_assert(context);
+    //CameraApp* app = context;
 
-    if(event->key == InputKeyUp && event->type == InputTypePress) {
-            ++app->delay;
-    }
-    else if (event->key == InputKeyUp && event->type == InputTypeRepeat) {
-            app->delay +=10;
-    }
-    else if (event->key == InputKeyDown && event->type == InputTypePress) {
-            --app->delay;
-    }
-    else if (event->key == InputKeyDown && event->type == InputTypeRepeat) {
-            app->delay -=10;
-    }
-    else if (event->key == InputKeyRight){
-            app->delay +=100;
-    }
-    else if (event->key == InputKeyLeft){
-            app->delay -=100;
-    }
-
-    UNUSED(save_image);
-    // if (event->type == InputTypePress){
-    //     if (event->key == InputKeyUp){
-    //         uart_send('C');
-    //     }
-    //     else if (event->key == InputKeyDown){
-    //         uart_send('c');
-    //     }
-    //     else if (event->key == InputKeyRight){
-    //         uart_send('>');
-    //     }
-    //     else if (event->key == InputKeyLeft){
-    //         uart_send('<');
-    //     }
-    //     else if (event->key == InputKeyOk){
-    //         uart_send('*');
-    //     }
-    //     else if (event->key == InputKeyOk){
-    //         save_image(context);
-    //     }
-    // }
-    // else
-    if (event->key == InputKeyBack){
-            furi_thread_flags_set(furi_thread_get_id(app->worker_thread), WorkerEventStop);
+    if (event->type == InputTypePress){
+        if (event->key == InputKeyUp){
+            uart_send('+');
+        }
+        else if (event->key == InputKeyDown){
+            uart_send('M');
+        }
+        else if (event->key == InputKeyRight){
+            uart_send('>');
+        }
+        else if (event->key == InputKeyLeft){
+            uart_send('<');
+        }
+        else if (event->key == InputKeyOk){
+            uart_send('*');
+        }
+        else if (event->key == InputKeyOk){
+            save_image(context);
+        }
     }
     
     return false;
@@ -228,7 +196,7 @@ static int32_t camera_worker(void* context) {
     furi_assert(context);
     CameraApp* app = context;
 
-    size_t prev_delay = 0;
+    vTaskPrioritySet(furi_thread_get_current_id(), FuriThreadPriorityIdle);
 
     while(1) {
         uint32_t events = furi_thread_flags_wait(WORKER_EVENTS_MASK, FuriFlagWaitAny, 0);
@@ -255,14 +223,7 @@ static int32_t camera_worker(void* context) {
                 }
             } while(length > 0);
 
-            //TODO Turn screen on permanently
-            //notification_message(app->notification, &sequence_notification);
-        }
-
-        size_t delay_ticks = furi_hal_cortex_instructions_per_microsecond() * app->delay;
-        if ((DWT->CYCCNT - prev_delay) >= delay_ticks) {
-            with_view_model(app->view, UartDumpModel * model, { model->delay_display = app->delay; }, true);
-            prev_delay = DWT->CYCCNT;
+            with_view_model(app->view, UartDumpModel * model, { UNUSED(model); }, true);
         }
     }
 
@@ -271,8 +232,6 @@ static int32_t camera_worker(void* context) {
 
 static CameraApp* camera_app_alloc() {
     CameraApp* app = malloc(sizeof(CameraApp));
-
-    app->delay = 12500;
 
     app->rx_stream = furi_stream_buffer_alloc(2048, 1);
 
@@ -297,18 +256,7 @@ static CameraApp* camera_app_alloc() {
         UartDumpModel * model,
         {
             for(size_t i = 0; i < FRAME_BUFFER_LENGTH; i++) {
-                if (i < 256){
-                    model->fb[i] = 0;
-                }
-                else if (i < 1024){
-                    model->fb[i] = 85;
-                }
-                else if (i < 1836){
-                    model->fb[i] = 170;
-                }
-                else {
-                    model->fb[i] = 255;
-                }
+                model->fb[i] = 255;
             }
         },
         true);
