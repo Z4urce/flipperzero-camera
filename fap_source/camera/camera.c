@@ -9,9 +9,6 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
     canvas_draw_frame(canvas, 0, 0, FRAME_WIDTH, FRAME_HEIGTH);
 
     for(size_t p = 0; p < FRAME_BUFFER_LENGTH; ++p) {
-        //uint8_t x = p % ROW_BUFFER_LENGTH; // 0 .. 15
-        //uint8_t y = p / ROW_BUFFER_LENGTH; // 0 .. 63
-        
         uint8_t x = row_lookup[p];
         uint8_t y = col_lookup[p];
         uint8_t fb_value = model->fb[p];
@@ -25,26 +22,6 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
                 canvas_draw_dot(canvas, (x * 4) + i, y);
             }
         }
-
-        // 1 bit
-        // for(uint8_t i = 0; i < 8; ++i) {
-        //     if((model->fb[p] & (1 << (7 - i))) != 0) {
-        //         canvas_draw_dot(canvas, (x * 8) + i, y);
-        //     }
-        // }
-
-        // 2 bit
-        // for (uint8_t i = 0; i < 4; ++i){ // 4 grayscale pixel in 1 fb element
-        //     // 0,1,2,3 ; 0,1 2,3 4,5 6,7
-        //     bool first_bit = model->fb[p] & (1 << (7 - (i*2)));
-        //     bool second_bit = model->fb[p] & (1 << (7 - ((i*2)+1)));
-
-        //     if((!second_bit && !first_bit) || // 00
-        //     ((second_bit && !first_bit) && (model->frame_count % 3 != 0))|| //10 - 170
-        //     ((!second_bit && first_bit) && ((model->frame_count*10) % 15 == 0))) {  //01 - 85
-        //         canvas_draw_dot(canvas, (x * 4) + i, y);
-        //     }
-        // }
     }
 
     if (!model->initialized){
@@ -221,7 +198,6 @@ static int32_t camera_worker(void* context) {
                 length = furi_stream_buffer_receive(app->rx_stream, data, intended_data_size, 0);
 
                 if(length > 0) {
-                    //furi_hal_uart_tx(FuriHalUartIdUSART1, data, length);
                     with_view_model(
                         app->view,
                         UartDumpModel * model, {
@@ -233,8 +209,9 @@ static int32_t camera_worker(void* context) {
                 }
             } while(length > 0);
 
-            with_view_model(app->view, UartDumpModel * model, { UNUSED(model); }, true);
+            //with_view_model(app->view, UartDumpModel * model, { UNUSED(model); }, true);
         }
+        with_view_model(app->view, UartDumpModel * model, { UNUSED(model); }, true);
     }
 
     return 0;
