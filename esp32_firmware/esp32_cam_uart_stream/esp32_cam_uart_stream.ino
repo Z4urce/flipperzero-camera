@@ -235,6 +235,19 @@ void execute_uart_command(){
         break;
       case 'z':
         s->set_framesize(s, FRAMESIZE_QQVGA);
+        break;
+      case 'I':
+        invert = true;
+        break;
+      case 'i':
+        invert = false;
+        break;
+      case '1':
+        bit_depth = 1;
+        break;
+      case '2':
+        bit_depth = 2;
+        break;
 
       // Toggle cases
       case 'M': // Toggle Mirror
@@ -245,10 +258,13 @@ void execute_uart_command(){
         break;
       case '<':
         invert = !invert;
+        break;
       case '+':
         s->set_framesize(s, (s->status.framesize == FRAMESIZE_QQVGA) ? FRAMESIZE_HQVGA : FRAMESIZE_QQVGA);
+        break;
       case '*':
         bit_depth = bit_depth == 1 ? 2 : 1;
+        break;
       default:
         break;
     }

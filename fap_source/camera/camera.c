@@ -131,10 +131,7 @@ static bool camera_view_input_callback(InputEvent* event, void* context) {
         }
         else if (event->key == InputKeyLeft){
             uart_send('<');
-        }
-        else if (event->key == InputKeyOk){
-            uart_send('*');
-        }
+        }//save image does not work with 2 bit depth yet.
         else if (event->key == InputKeyOk){
             save_image(context);
         }
@@ -272,7 +269,9 @@ static CameraApp* camera_app_alloc() {
     furi_hal_console_disable();
     furi_hal_uart_set_br(FuriHalUartIdUSART1, 230400);
     furi_hal_uart_set_irq_cb(FuriHalUartIdUSART1, camera_on_irq_cb, app);
+    
     uart_send('S');
+    uart_send('2');
 
     notification_message_block(app->notification, &sequence_display_backlight_enforce_on);
 
