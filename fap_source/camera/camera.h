@@ -25,9 +25,9 @@
 
 #define FRAME_WIDTH 128
 #define FRAME_HEIGTH 64
-#define FRAME_BIT_DEPTH 1
+#define FRAME_BIT_DEPTH 2
 #define FRAME_BUFFER_LENGTH (FRAME_WIDTH * FRAME_HEIGTH * FRAME_BIT_DEPTH / 8) // 128*64*1 / 8 = 1024
-#define ROW_BUFFER_LENGTH (FRAME_WIDTH / 8) // 128/8 = 16
+#define ROW_BUFFER_LENGTH (FRAME_WIDTH * FRAME_BIT_DEPTH / 8) // 128/8 = 16
 #define LAST_ROW_INDEX (FRAME_BUFFER_LENGTH - ROW_BUFFER_LENGTH) // 1024 - 16 = 1008
 #define RING_BUFFER_LENGTH (ROW_BUFFER_LENGTH + 3) // ROW_BUFFER_LENGTH + Header => 16 + 3 = 19
 #define BITMAP_HEADER_LENGTH 62
@@ -55,15 +55,17 @@ typedef struct {
     View* view;
     FuriThread* worker_thread;
     FuriStreamBuffer* rx_stream;
-} UartEchoApp;
+    size_t delay;
+} CameraApp;
 
 struct UartDumpModel {
-    uint8_t pixels[FRAME_BUFFER_LENGTH];
-
+    uint8_t fb[FRAME_BUFFER_LENGTH];
+    size_t frame_count;
     bool initialized;
 
     uint8_t row_ringbuffer[RING_BUFFER_LENGTH];
     uint8_t ringbuffer_index;
+    size_t delay_display;
 };
 
 typedef enum {

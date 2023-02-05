@@ -13,9 +13,27 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         uint8_t x = p % ROW_BUFFER_LENGTH; // 0 .. 15
         uint8_t y = p / ROW_BUFFER_LENGTH; // 0 .. 63
 
-        for(uint8_t i = 0; i < 8; ++i) {
-            if((model->pixels[p] & (1 << (7 - i))) != 0) {
-                canvas_draw_dot(canvas, (x * 8) + i, y);
+        // for(uint8_t i = 0; i < 8; ++i) {
+        //     if((model->fb[p] & (1 << (7 - i))) != 0) {
+        //         canvas_draw_dot(canvas, (x * 8) + i, y);
+        //     }
+        // }
+        for (uint8_t i = 0; i < 4; ++i){ // 4 grayscale pixel in 1 fb element
+            // 0,1,2,3 ; 0,1 2,3 4,5 6,7
+            bool first_bit = model->fb[p] & (1 << (7 - (i*2)));
+            bool second_bit = model->fb[p] & (1 << (7 - ((i*2)+1)));
+            // 0 = 00, 85 = 01, 170 = 10, 255 = 11
+            // if ((!second_bit && first_bit) && ((model->frame_count*10) % 15 == 0)){
+            //     canvas_draw_dot(canvas, (x * 4) + i, y);
+            // }
+            // if ((second_bit && !first_bit) && (model->frame_count % 3 != 0)){
+            //    canvas_draw_dot(canvas, (x * 4) + i, y);
+            // }
+
+            if((!second_bit && !first_bit) || // 00
+            ((second_bit && !first_bit) && (model->frame_count % 3 != 0))|| //10 - 170
+            ((!second_bit && first_bit) && ((model->frame_count*10) % 15 == 0))) {  //01 - 85
+                canvas_draw_dot(canvas, (x * 4) + i, y);
             }
         }
     }
@@ -29,6 +47,12 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         canvas_draw_str(canvas, 20, 44, "U0R - TX");
         canvas_draw_str(canvas, 20, 54, "U0T - RX");
     }
+
+    char buffer[32] = {0};
+    snprintf(buffer, 32, "Delay: %u", model->delay_display);
+    canvas_draw_str(canvas, 20, 64, buffer);
+
+    ++model->frame_count;
 }
 
 void get_timefilename(FuriString* name) {
@@ -46,7 +70,7 @@ void get_timefilename(FuriString* name) {
 }
 
 static void save_image(void* context) {
-    UartEchoApp* app = context;
+    CameraApp* app = context;
     furi_assert(app);
 
     NotificationApp* notifications = furi_record_open(RECORD_NOTIFICATION);
@@ -76,7 +100,7 @@ static void save_image(void* context) {
             int8_t row_buffer[ROW_BUFFER_LENGTH];
             for (size_t i = 64; i > 0; --i) {
                 for (size_t j = 0; j < ROW_BUFFER_LENGTH; ++j){
-                    row_buffer[j] = model->pixels[((i-1)*ROW_BUFFER_LENGTH) + j];
+                    row_buffer[j] = model->fb[((i-1)*ROW_BUFFER_LENGTH) + j];
                 }
                 storage_file_write(file, row_buffer, ROW_BUFFER_LENGTH);
             }
@@ -93,38 +117,73 @@ static void save_image(void* context) {
     notification_message(notifications, result ? &sequence_success : &sequence_error);
 }
 
+static void uart_send(char c){
+    uint8_t data[1];
+    data[0] = c;
+    furi_hal_uart_tx(FuriHalUartIdUSART1, data, 1);
+}
+
 static bool camera_view_input_callback(InputEvent* event, void* context) {
-    if (event->type == InputTypePress){
-        uint8_t data[1];
-        if (event->key == InputKeyUp){
-            data[0] = 'C';
-        }
-        else if (event->key == InputKeyDown){
-            data[0] = 'c';
-        }
-        else if (event->key == InputKeyRight){
-            data[0] = '>';
-        }
-        else if (event->key == InputKeyLeft){
-            data[0] = '<';
-        }
-        else if (event->key == InputKeyOk){
-            save_image(context);
-        }
-        furi_hal_uart_tx(FuriHalUartIdUSART1, data, 1);
+    furi_assert(context);
+    CameraApp* app = context;
+
+    if(event->key == InputKeyUp && event->type == InputTypePress) {
+            ++app->delay;
+    }
+    else if (event->key == InputKeyUp && event->type == InputTypeRepeat) {
+            app->delay +=10;
+    }
+    else if (event->key == InputKeyDown && event->type == InputTypePress) {
+            --app->delay;
+    }
+    else if (event->key == InputKeyDown && event->type == InputTypeRepeat) {
+            app->delay -=10;
+    }
+    else if (event->key == InputKeyRight){
+            app->delay +=100;
+    }
+    else if (event->key == InputKeyLeft){
+            app->delay -=100;
+    }
+
+    UNUSED(save_image);
+    // if (event->type == InputTypePress){
+    //     if (event->key == InputKeyUp){
+    //         uart_send('C');
+    //     }
+    //     else if (event->key == InputKeyDown){
+    //         uart_send('c');
+    //     }
+    //     else if (event->key == InputKeyRight){
+    //         uart_send('>');
+    //     }
+    //     else if (event->key == InputKeyLeft){
+    //         uart_send('<');
+    //     }
+    //     else if (event->key == InputKeyOk){
+    //         uart_send('*');
+    //     }
+    //     else if (event->key == InputKeyOk){
+    //         save_image(context);
+    //     }
+    // }
+    // else
+    if (event->key == InputKeyBack){
+            furi_thread_flags_set(furi_thread_get_id(app->worker_thread), WorkerEventStop);
     }
     
     return false;
 }
 
 static uint32_t camera_exit(void* context) {
+    uart_send('s');
     UNUSED(context);
     return VIEW_NONE;
 }
 
 static void camera_on_irq_cb(UartIrqEvent ev, uint8_t data, void* context) {
     furi_assert(context);
-    UartEchoApp* app = context;
+    CameraApp* app = context;
 
     if(ev == UartIrqEventRXNE) {
         furi_stream_buffer_send(app->rx_stream, &data, 1, 0);
@@ -138,7 +197,7 @@ static void process_ringbuffer(UartDumpModel* model, uint8_t byte) {
         return;
     }
     
-    if (model->ringbuffer_index == 1 && byte != ':'){ // Second char has to be ':' in the buffer or reset.
+    if (model->ringbuffer_index == 1 && byte != '2'){ // Second char has to be ':' in the buffer or reset.
         model->ringbuffer_index = 0;
         process_ringbuffer(model, byte);
         return;
@@ -161,18 +220,19 @@ static void process_ringbuffer(UartDumpModel* model, uint8_t byte) {
     }
 
     for (size_t i = 0; i < ROW_BUFFER_LENGTH; ++i) {
-        model->pixels[row_start_index + i] = model->row_ringbuffer[i+3]; // Writing the remaining 16 bytes into the frame buffer
+        model->fb[row_start_index + i] = model->row_ringbuffer[i+3]; // Writing the remaining 16 bytes into the frame buffer
     }
 }
 
 static int32_t camera_worker(void* context) {
     furi_assert(context);
-    UartEchoApp* app = context;
+    CameraApp* app = context;
+
+    size_t prev_delay = 0;
 
     while(1) {
-        uint32_t events =
-            furi_thread_flags_wait(WORKER_EVENTS_MASK, FuriFlagWaitAny, FuriWaitForever);
-        furi_check((events & FuriFlagError) == 0);
+        uint32_t events = furi_thread_flags_wait(WORKER_EVENTS_MASK, FuriFlagWaitAny, 0);
+        //furi_check((events & FuriFlagError) == 0);
 
         if(events & WorkerEventStop) break;
         if(events & WorkerEventRx) {
@@ -195,16 +255,24 @@ static int32_t camera_worker(void* context) {
                 }
             } while(length > 0);
 
-            notification_message(app->notification, &sequence_notification);
-            with_view_model(app->view, UartDumpModel * model, { UNUSED(model); }, true);
+            //TODO Turn screen on permanently
+            //notification_message(app->notification, &sequence_notification);
+        }
+
+        size_t delay_ticks = furi_hal_cortex_instructions_per_microsecond() * app->delay;
+        if ((DWT->CYCCNT - prev_delay) >= delay_ticks) {
+            with_view_model(app->view, UartDumpModel * model, { model->delay_display = app->delay; }, true);
+            prev_delay = DWT->CYCCNT;
         }
     }
 
     return 0;
 }
 
-static UartEchoApp* camera_app_alloc() {
-    UartEchoApp* app = malloc(sizeof(UartEchoApp));
+static CameraApp* camera_app_alloc() {
+    CameraApp* app = malloc(sizeof(CameraApp));
+
+    app->delay = 12500;
 
     app->rx_stream = furi_stream_buffer_alloc(2048, 1);
 
@@ -229,7 +297,18 @@ static UartEchoApp* camera_app_alloc() {
         UartDumpModel * model,
         {
             for(size_t i = 0; i < FRAME_BUFFER_LENGTH; i++) {
-                model->pixels[i] = 0;
+                if (i < 256){
+                    model->fb[i] = 0;
+                }
+                else if (i < 1024){
+                    model->fb[i] = 85;
+                }
+                else if (i < 1836){
+                    model->fb[i] = 170;
+                }
+                else {
+                    model->fb[i] = 255;
+                }
             }
         },
         true);
@@ -245,11 +324,14 @@ static UartEchoApp* camera_app_alloc() {
     furi_hal_console_disable();
     furi_hal_uart_set_br(FuriHalUartIdUSART1, 230400);
     furi_hal_uart_set_irq_cb(FuriHalUartIdUSART1, camera_on_irq_cb, app);
+    uart_send('S');
+
+    notification_message_block(app->notification, &sequence_display_backlight_enforce_on);
 
     return app;
 }
 
-static void camera_app_free(UartEchoApp* app) {
+static void camera_app_free(CameraApp* app) {
     furi_assert(app);
 
     furi_hal_console_enable(); // this will also clear IRQ callback so thread is no longer referenced
@@ -264,6 +346,8 @@ static void camera_app_free(UartEchoApp* app) {
     view_free(app->view);
     view_dispatcher_free(app->view_dispatcher);
 
+    notification_message(app->notification, &sequence_display_backlight_enforce_auto);
+
     // Close gui record
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);
@@ -277,7 +361,7 @@ static void camera_app_free(UartEchoApp* app) {
 
 int32_t camera_app(void* p) {
     UNUSED(p);
-    UartEchoApp* app = camera_app_alloc();
+    CameraApp* app = camera_app_alloc();
     view_dispatcher_run(app->view_dispatcher);
     camera_app_free(app);
     return 0;
