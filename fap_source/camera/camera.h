@@ -20,6 +20,9 @@
 #include <gui/modules/dialog_ex.h>
 #include <storage/filesystem_api_defines.h>
 #include <storage/storage.h>
+#include <u8g2.h>
+#include <gui/canvas.h>
+#include <gui/canvas_i.h>
 
 #define THREAD_ALLOC 2048
 
@@ -77,3 +80,14 @@ typedef enum {
 uint8_t row_lookup[FRAME_BUFFER_LENGTH]; // precomputed x values
 uint8_t col_lookup[FRAME_BUFFER_LENGTH]; // precomputed y values
 uint8_t colors_lookup[256][4];
+
+// struct Canvas {
+//     u8g2_t fb;
+//     CanvasOrientation orientation;
+//     uint8_t offset_x;
+//     uint8_t offset_y;
+//     uint8_t width;
+//     uint8_t height;
+// };
+
+// typedef struct Canvas Canvas;

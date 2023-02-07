@@ -6,8 +6,8 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
     // Prepare canvas
     //canvas_clear(canvas);
     canvas_set_color(canvas, ColorBlack);
-    canvas_draw_frame(canvas, 0, 0, FRAME_WIDTH, FRAME_HEIGTH);
-
+    canvas_draw_frame(canvas, 0, 0, FRAME_WIDTH, FRAME_HEIGTH); 
+    
     for(size_t p = 0; p < FRAME_BUFFER_LENGTH; ++p) {
         uint8_t x = row_lookup[p];
         uint8_t y = col_lookup[p];
@@ -17,8 +17,8 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
             uint8_t color = colors_lookup[fb_value][i];
             
             if (color == 0 ||
-                ((color == 170) && (model->frame_count % 3 != 0)) ||
-                ((color == 85) && ((model->frame_count*10) % 15 == 0))) {
+                ((color == 85) && (model->frame_count != 0)) ||
+                ((color == 170) && (model->frame_count == 0))) {
                 canvas_draw_dot(canvas, (x * 4) + i, y);
             }
         }
@@ -34,7 +34,16 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         canvas_draw_str(canvas, 20, 54, "U0T - RX");
     }
 
-    ++model->frame_count;
+    if (++model->frame_count == 3){
+        model->frame_count = 0;
+    }
+
+    for (size_t i = 0; i < 1024; i++)
+    {
+        canvas->fb.tile_buf_ptr[i] = 170;
+    }
+    //canvas_commit(canvas);
+    
 }
 
 void get_timefilename(FuriString* name) {

@@ -10,7 +10,7 @@ if (frame_count % 3 != 0){
 }
 
 // 10 (170)
-if ((frame_count*10) % 15 == 0){
+if (frame_count % 3 == 0){
         canvas_draw_box(instance->canvas, 64, 32, 32, 32);
 }
 
