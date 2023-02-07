@@ -38,10 +38,10 @@ static void camera_view_draw_callback(Canvas* canvas, void* _model) {
         model->frame_count = 0;
     }
 
-    for (size_t i = 0; i < 1024; i++)
-    {
-        canvas->fb.tile_buf_ptr[i] = 170;
-    }
+    // for (size_t i = 0; i < 1024; i++)
+    // {
+    //     canvas->fb.tile_buf_ptr[i] = 170;
+    // }
     //canvas_commit(canvas);
     
 }
