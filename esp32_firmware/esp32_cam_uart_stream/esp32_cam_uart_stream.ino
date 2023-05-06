@@ -166,18 +166,33 @@ bool IsDarkBit(uint8_t bit){
   return result;
 }
 
-void DitherImage(camera_fb_t* fb) {
-  for(uint8_t y = 0; y < fb->height; ++y){
-      for (uint8_t x = 0; x < fb->width; ++x){
-        size_t current = (y*fb->width) + x;
-        uint8_t oldpixel = fb->buf[current];
-        uint8_t newpixel = oldpixel >= 128 ? 255 : 0;
-        fb->buf[current] = newpixel;
-        uint8_t quant_error = oldpixel - newpixel;
-        fb->buf[(y*fb->width) + x + 1] = fb->buf[(y*fb->width) + x + 1] + quant_error * 7 / 16;
-        fb->buf[(y+1*fb->width) + x-1] = fb->buf[(y+1*fb->width) + x-1] + quant_error * 3 / 16;
-        fb->buf[(y + 1*fb->width) + x] = fb->buf[(y + 1*fb->width) + x] + quant_error * 5 / 16;
-        fb->buf[(y+1*fb->width) + x+1] = fb->buf[(y+1*fb->width) + x+1] + quant_error * 1 / 16;
+void DitherImage(camera_fb_t *fb) {
+  for (uint8_t y = 0; y < fb->height; ++y) {
+    for (uint8_t x = 0; x < fb->width; ++x) {
+      size_t current = (y * fb->width) + x;
+      uint8_t oldpixel = fb->buf[current];
+      uint8_t newpixel = oldpixel >= 128 ? 255 : 0;
+      fb->buf[current] = newpixel;
+      int8_t quant_error = oldpixel - newpixel;
+
+      if (x + 1 < fb->width) {
+        fb->buf[y * fb->width + x + 1] += (quant_error * 1 / 8);
       }
-    }  
+      if (x + 2 < fb->width) {
+        fb->buf[y * fb->width + x + 2] += (quant_error * 1 / 8);
+      }
+      if (x > 0 && y + 1 < fb->height) {
+        fb->buf[(y + 1) * fb->width + x - 1] += (quant_error * 1 / 8);
+      }
+      if (y + 1 < fb->height) {
+        fb->buf[(y + 1) * fb->width + x] += (quant_error * 1 / 8);
+      }
+      if (y + 1 < fb->height && x + 1 < fb->width) {
+        fb->buf[(y + 1) * fb->width + x + 1] += (quant_error * 1 / 8);
+      }
+      if (y + 2 < fb->height) {
+        fb->buf[(y + 2) * fb->width + x] += (quant_error * 1 / 8);
+      }
+    }
+  }
 }
